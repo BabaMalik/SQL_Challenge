@@ -2,6 +2,7 @@
 
 # 🏆 SQL Analysis using Medallion Architecture
 
+
 ## 📌 Overview
 This repository contains SQL scripts implementing the **Medallion Architecture (Bronze, Silver, Gold layers)** for structured data processing and analytics.
 
