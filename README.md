@@ -1,51 +1,32 @@
-
-
 # 🏆 SQL Analysis using Medallion Architecture
 
 ## 📌 Overview
-This project implements **SQL-based ETL workflows** using the **Medallion Architecture** in **MySQL Workbench**.  
-The goal is to **ingest, clean, and transform raw transactional data** into **structured, analytics-ready data**.  
+This repository contains SQL scripts implementing the **Medallion Architecture (Bronze, Silver, Gold layers)** for structured data processing and analytics.
 
-### **Medallion Architecture - 3 Layers**
-- 🟤 **Bronze Layer** → Raw data ingestion (**This README focuses on this layer**)
-- ⚪ **Silver Layer** → Cleansed and processed data (*Future work*)
-- 🟡 **Gold Layer** → Business insights and reporting (*Future work*)
+### **What is Medallion Architecture?**
+The Medallion Architecture is a data engineering design pattern used to **organize data into three layers**:
+- 🟤 **Bronze Layer**: Raw data ingestion (this repository focuses on this layer so far)
+- ⚪ **Silver Layer**: Cleaned and processed data
+- 🟡 **Gold Layer**: Business insights and reporting
 
----
-
-## 🛠️ **Step 1: Loading Data into MySQL Workbench**
-I started by **loading a CSV file** containing **transactional data** into MySQL Workbench.  
-This dataset contains customer transactions, product purchases, and metadata.
-
-### **📌 Dataset Schema (Raw Data)**
-| Field             | Type          | Description |
-|------------------|--------------|-------------|
-| `TransactionID`   | INT          | Unique transaction identifier |
-| `CustomerID`      | INT          | Unique customer identifier |
-| `TransactionDate` | DATE         | Date of the transaction |
-| `TransactionAmount` | DOUBLE      | Total amount of the transaction |
-| `PaymentMethod`   | VARCHAR(50)  | Mode of payment (Credit Card, PayPal, etc.) |
-| `Quantity`        | INT          | Number of items purchased |
-| `DiscountPercent` | DOUBLE       | Discount applied to the transaction |
-| `City`           | VARCHAR(100) | Customer’s city |
-| `StoreType`       | VARCHAR(50)  | Type of store (Online, Physical) |
-| `CustomerAge`     | INT          | Age of the customer |
-| `CustomerGender`  | VARCHAR(10)  | Gender of the customer |
-| `LoyaltyPoints`   | INT          | Customer loyalty points |
-| `ProductName`     | VARCHAR(100) | Name of the purchased product |
-| `Region`         | VARCHAR(100) | Customer’s region |
-| `Returned`        | VARCHAR(10)  | Whether the product was returned (Yes/No) |
-| `FeedbackScore`   | INT          | Customer feedback score |
-| `ShippingCost`    | DOUBLE       | Cost of shipping the product |
-| `DeliveryTimeDays` | INT         | Days taken for delivery |
-| `IsPromotional`   | VARCHAR(10)  | Whether the purchase was part of a promotion |
+This repository focuses on the **Bronze Layer**, where raw data is ingested and minimally processed.
 
 ---
 
-## 🟤 **Step 2: Creating the Bronze Layer (Raw Data Ingestion)**
-The **Bronze Layer** is where we store raw data without modifications. This is the first step in the Medallion Architecture.
+## 🏗 Bronze Layer: Raw Data Ingestion
+### **Objective**
+- Load raw **CSV data** into MySQL Workbench.
+- Store data in the **Bronze Layer** without transformation (except for minor cleaning).
+- Ensure raw data is accessible for further processing in the Silver Layer.
 
-### **📜 Creating the `bronze_transactions` Table**
+### **Steps Performed**
+#### **1️⃣ Loading Data into MySQL**
+- The CSV file containing transactional data was loaded into MySQL Workbench.
+- The dataset was stored in the `TRANSACTIONS.assessment_dataset` table.
+
+#### **2️⃣ Creating the Bronze Table**
+To store raw data, we created the `bronze_transactions` table:
+
 ```sql
 CREATE TABLE TRANSACTIONS.bronze_transactions (
     TransactionID INT,
@@ -70,106 +51,74 @@ CREATE TABLE TRANSACTIONS.bronze_transactions (
 );
 ```
 
----
-
-## 🔄 **Step 3: Loading Data into the Bronze Layer**
-I copied all raw data from the `assessment_dataset` into the newly created `bronze_transactions` table.
+#### **3️⃣ Ingesting Data into Bronze Layer**
+We inserted the raw data from `assessment_dataset` into `bronze_transactions`.
 
 ```sql
 INSERT INTO TRANSACTIONS.bronze_transactions
 SELECT * FROM TRANSACTIONS.assessment_dataset;
 ```
 
-However, some **data cleaning issues** were identified:
-- **Dates were in an incorrect format** (needed conversion)
-- **Empty or invalid values in CustomerID and TransactionDate** (needed fixing)
-- **Some fields contained non-numeric values** where numbers were expected
+#### **4️⃣ Data Cleaning & Handling Issues**
+We identified and fixed common data issues:
 
----
+- **Fixing `TransactionDate` format:**
+  ```sql
+  UPDATE TRANSACTIONS.assessment_dataset
+  SET TransactionDate = STR_TO_DATE(TransactionDate, '%m/%d/%Y %H:%i')
+  WHERE TransactionDate IS NOT NULL AND TransactionDate <> '';
+  ```
 
-## 🔍 **Step 4: Data Cleaning in the Bronze Layer**
-### **✅ Fixing Date Format**
-The `TransactionDate` column had inconsistent formats. I converted it to a **standard DATETIME format**:
-```sql
-UPDATE TRANSACTIONS.assessment_dataset
-SET TransactionDate = STR_TO_DATE(TransactionDate, '%m/%d/%Y %H:%i')
-WHERE TransactionDate IS NOT NULL AND TransactionDate <> '';
-```
+- **Handling missing `CustomerID` values:**
+  ```sql
+  UPDATE TRANSACTIONS.assessment_dataset
+  SET CustomerID = NULL
+  WHERE CustomerID = '' OR CustomerID REGEXP '[^0-9]';
+  ```
 
-### **✅ Handling Missing CustomerIDs**
-Some `CustomerID` values were empty or contained non-numeric characters. I set them to `NULL`:
-```sql
-UPDATE TRANSACTIONS.assessment_dataset
-SET CustomerID = NULL
-WHERE CustomerID = '' OR CustomerID REGEXP '[^0-9]';
-```
+- **Checking incorrect date formats:**
+  ```sql
+  SELECT TransactionDate
+  FROM TRANSACTIONS.assessment_dataset
+  WHERE TransactionDate NOT REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$';
+  ```
 
-### **✅ Checking for Incorrect Time Zone Settings**
-To ensure date values were correctly interpreted, I checked and adjusted the time zone:
-```sql
-SELECT @@global.time_zone, @@session.time_zone;
-SET time_zone = '+00:00';
-```
-
-### **✅ Validating Date Format in Bronze Layer**
-To ensure `TransactionDate` is correctly formatted as `YYYY-MM-DD HH:MM:SS`, I ran:
-```sql
-SELECT TransactionDate 
-FROM TRANSACTIONS.assessment_dataset 
-WHERE TransactionDate NOT REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$';
-```
-
----
-
-## ✅ **Final Steps: Ensuring Data Integrity**
-After fixing issues, I inserted the cleaned data into `bronze_transactions`:
-
-```sql
-INSERT INTO TRANSACTIONS.bronze_transactions
-SELECT * FROM TRANSACTIONS.assessment_dataset;
-```
-
-To confirm everything worked as expected:
+#### **5️⃣ Validating the Data**
+After cleaning, we verified that data was correctly inserted into the Bronze Layer:
 ```sql
 SELECT * FROM TRANSACTIONS.bronze_transactions;
 ```
 
 ---
 
-## 📂 **Project Structure**
+## 📂 Project Structure
+📁 **assessment-medallion-sql**
 ```
-📂 assessment-medallion-sql/
-├── 📜 README.md                  # Project Documentation
-├── 📂 sql-scripts/
-│   ├── 🟤 bronze_layer.sql        # Raw data ingestion queries
-│   ├── ⚪ silver_layer.sql         # Cleansed & transformed data queries (*Future Work*)
-│   ├── 🟡 gold_layer.sql          # Business insights & reporting queries (*Future Work*)
-│   ├── 📜 exploratory_analysis.sql  # Ad-hoc queries for data exploration
-├── 📂 documentation/
-│   ├── 📜 design_decisions.md     # Why Medallion Architecture?
-│   ├── 📜 best_practices.md       # SQL Optimization & Indexing Strategies
+├── 📜 README.md   --> (Project Documentation)
+├── 📁 sql-scripts
+│   ├── 🟤 bronze_layer.sql   --> (Raw Data Queries & Cleaning Scripts)
+│   ├── ⚪ silver_layer.sql   --> (Cleansed Data Queries - Future Work)
+│   ├── 🟡 gold_layer.sql   --> (Business Insights Queries - Future Work)
+│
+├── 📁 documentation
+│   ├── 📜 design_decisions.md   --> (Why Medallion Architecture?)
+│   ├── 📜 best_practices.md   --> (SQL Optimization & Indexing)
 ```
 
 ---
 
-## 🚀 **Next Steps**
-Now that the **Bronze Layer** is set up, the next steps will be:
-1. **Transforming data into the Silver Layer** (cleaning, deduplication, and structuring)
-2. **Building the Gold Layer** (aggregations, insights, and business reporting)
-3. **Optimizing queries for performance** (indexing, partitioning, and caching)
+## 📌 Next Steps
+✅ **Bronze Layer** - ✅ Completed 🚀  
+🟩 **Silver Layer** - To be implemented (data transformation, deduplication, validation)  
+🟨 **Gold Layer** - Future work (business insights, dashboards, aggregations)  
+
+🔹 **For full SQL scripts, check [`sql-scripts/bronze_layer.sql`](sql-scripts/bronze_layer.sql)**
 
 ---
 
-## 🏁 **Conclusion**
-This project successfully implemented **the first phase of Medallion Architecture** by ingesting raw transactional data into the **Bronze Layer**. The next step is to process and clean this data for the **Silver Layer**.  
+## 👨‍💻 Author
+🚀 **Baba Malik Hussain** - Passionate about Data Engineering & Medallion Architecture.
 
-This approach ensures **scalability, data integrity, and efficiency** in analytics workflows! 🔥  
+📧 Reach out on LinkedIn / GitHub for any discussions!
 
----
 
-## 💡 **Want to Contribute?**
-If you have suggestions for improvements or optimizations, feel free to open an issue or a pull request! 🚀  
-
----
-
-This README is **structured, engaging, and professional** while keeping it **easy to read**. Let me know if you need modifications! 🔥
