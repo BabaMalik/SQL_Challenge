@@ -20,3 +20,11 @@ CREATE TABLE bronze_transactions (
     DeliveryTimeDays INT,
     IsPromotional BOOLEAN
 );
+
+
+--- Checking first 10 rows
+SELECT * FROM bronze_transactions LIMIT 10;
+
+--- Count the Total Rows
+SELECT COUNT(*) AS total_records FROM bronze_transactions;
+
