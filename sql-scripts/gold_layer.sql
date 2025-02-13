@@ -15,16 +15,23 @@ CREATE TABLE gold_transactions (
 );
 
 
-DROP TEMPORARY TABLE IF EXISTS temp_gold_metrics;
-CREATE TEMPORARY TABLE temp_gold_metrics AS
+-- 1. Customer Analytics Table
+CREATE TABLE gold_customer_analytics AS
 SELECT 
     CustomerID,
-    COUNT(TransactionID) AS TotalTransactions,
-    SUM(TransactionAmount) AS TotalSpent,
-    ROUND(AVG(TransactionAmount), 2) AS AvgTransactionValue,
-    ROUND(SUM(TransactionAmount) / NULLIF(COUNT(DISTINCT YEAR(TransactionDate)), 1), 2) AS CustomerLifetimeValue,
-    ROUND(SUM(CASE WHEN Returned = 'Yes' THEN 1 ELSE 0 END) / COUNT(TransactionID) * 100, 2) AS ReturnRate,
-    MAX(customer_segment) AS CustomerSegment
+    MIN(TransactionDate) as first_purchase_date,
+    MAX(TransactionDate) as last_purchase_date,
+    COUNT(DISTINCT TransactionID) as total_transactions,
+    SUM(total_sale_value) as total_spent,
+    AVG(total_sale_value) as avg_transaction_value,
+    SUM(Quantity) as total_items_purchased,
+    MAX(customer_segment) as customer_segment,
+    MAX(age_group) as age_group,
+    MAX(CustomerGender) as gender,
+    MAX(LoyaltyPoints) as loyalty_points,
+    COUNT(DISTINCT ProductName) as unique_products_bought,
+    SUM(CASE WHEN Returned = 'Yes' THEN 1 ELSE 0 END) as total_returns,
+    AVG(FeedbackScore) as avg_feedback_score
 FROM silver_transactions
 GROUP BY CustomerID;
 
