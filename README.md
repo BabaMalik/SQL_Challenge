@@ -255,22 +255,6 @@ FROM silver_transactions;
 ```
 
 ---
-
-## Conclusion
-This Silver Layer ensures that transaction data is **clean, enriched, and structured** before moving into the Gold Layer for final aggregation and reporting. The transformation pipeline handles missing values, assigns data quality scores, and ensures consistency across the dataset.
-
-
-
-## 🛠 **Contributing**
-1. Fork this repository.
-2. Create a new branch for your feature.
-3. Submit a pull request.
-
----
-
-
-
-
 ---
 
 ## **Project Structure**
@@ -285,6 +269,20 @@ assessment-medallion-sql
 
 
 ```
+--- 
+## Conclusion
+This Silver Layer ensures that transaction data is **clean, enriched, and structured** before moving into the Gold Layer for final aggregation and reporting. The transformation pipeline handles missing values, assigns data quality scores, and ensures consistency across the dataset.
+
+
+
+## 🛠 **Contributing**
+1. Fork this repository.
+2. Create a new branch for your feature.
+3. Submit a pull request.
+
+---
+
+
 
 ---
 
