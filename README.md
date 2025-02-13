@@ -351,10 +351,10 @@ This **cleaned & structured data** is now ready for **Gold Layer** processing, w
 assessment-medallion-sql
 ├── README.md               # Project Documentation
 ├── sql-scripts
-│   ├── bronze_layer.sql    # Raw Data Queries & Cleaning Scripts
-│   ├── silver_layer.sql    # Cleansed Data Queries (Future Work)
-│   ├── gold_layer.sql      # Business Insights Queries (Future Work)
-│
+    ├── bronze_layer.sql    # Raw Data Queries & Cleaning Scripts
+    ├── silver_layer.sql    # Cleansed Data Queries (Future Work)
+    ├── gold_layer.sql      # Business Insights Queries (Future Work)
+
 
 ```
 
