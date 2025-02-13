@@ -82,7 +82,6 @@ FROM bronze_transactions;
 
 ## 📌 Overview
 
-## Overview
 The **Silver Layer** is an enriched, cleansed, and structured version of transactional data obtained from the **Bronze Layer**. This layer ensures data integrity, assigns default values to missing records, and enhances data with additional derived attributes for downstream analysis in the **Gold Layer**.
 
 ### 🔹 **Key Features**
