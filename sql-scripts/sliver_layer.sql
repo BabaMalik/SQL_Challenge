@@ -3,7 +3,6 @@ CREATE TABLE silver_transactions_backup AS
 SELECT * FROM silver_transactions;
 
 -- Step 2: Drop and recreate silver_transactions table
--- Removed TRANSACTIONS schema reference as it wasn't consistently used
 DROP TABLE IF EXISTS silver_transactions;
 
 CREATE TABLE silver_transactions (
