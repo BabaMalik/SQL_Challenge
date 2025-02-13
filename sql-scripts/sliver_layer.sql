@@ -1,5 +1,10 @@
--- Step 1: Create silver_transactions table
-DROP TABLE IF EXISTS TRANSACTIONS.silver_transactions;
+-- Step 1: Backup existing table
+CREATE TABLE silver_transactions_backup AS 
+SELECT * FROM silver_transactions;
+
+-- Step 2: Drop and recreate silver_transactions table
+-- Removed TRANSACTIONS schema reference as it wasn't consistently used
+DROP TABLE IF EXISTS silver_transactions;
 
 CREATE TABLE silver_transactions (
     TransactionID INT PRIMARY KEY,
@@ -13,17 +18,17 @@ CREATE TABLE silver_transactions (
     StoreType VARCHAR(255) NULL,
     CustomerAge INT NULL,
     CustomerGender VARCHAR(255) NULL,
-    LoyaltyPoints INT,
-    ProductName VARCHAR(255),
-    Region VARCHAR(255),
-    Returned VARCHAR(255),
-    FeedbackScore INT,
+    LoyaltyPoints INT NULL,  -- Added NULL constraint for consistency
+    ProductName VARCHAR(255) NULL,  -- Added NULL constraint for consistency
+    Region VARCHAR(255) NULL,  -- Added NULL constraint for consistency
+    Returned VARCHAR(255) NULL,  -- Added NULL constraint for consistency
+    FeedbackScore INT NULL,
     ShippingCost DECIMAL(10,2) NULL,
-    DeliveryTimeDays INT,
-    IsPromotional VARCHAR(255)
+    DeliveryTimeDays INT NULL,
+    IsPromotional VARCHAR(255) NULL
 );
 
--- Step 2: Insert data from bronze to silver
+-- Step 3: Insert data from bronze table
 INSERT INTO silver_transactions
 SELECT 
     TransactionID,
@@ -47,97 +52,104 @@ SELECT
     IsPromotional
 FROM bronze_transactions;
 
-
--- Verify the data load
-SELECT COUNT(*) as total_records FROM silver_transactions;
-SELECT COUNT(*) as total_records FROM bronze_transactions;
-
--- Step 3: Add new columns for silver layer enrichment
+-- Step 4: Add new columns (moved before data population)
 ALTER TABLE silver_transactions
 ADD COLUMN transaction_year INT,
 ADD COLUMN transaction_month INT,
 ADD COLUMN transaction_quarter INT,
-ADD COLUMN total_sale_value DECIMAL(10,2),
-ADD COLUMN discount_amount DECIMAL(10,2),
-ADD COLUMN net_revenue DECIMAL(10,2),
+ADD COLUMN total_sale_value DECIMAL(18,6),
+ADD COLUMN discount_amount DECIMAL(18,6),
+ADD COLUMN net_revenue DECIMAL(18,6),
 ADD COLUMN customer_segment VARCHAR(50),
 ADD COLUMN age_group VARCHAR(50),
 ADD COLUMN is_weekend BOOLEAN,
 ADD COLUMN day_of_week VARCHAR(20),
 ADD COLUMN transaction_status VARCHAR(50),
-ADD COLUMN data_quality_score DECIMAL(5,2);
+ADD COLUMN data_quality_score DECIMAL(5,2),
+ADD COLUMN data_issue_flag VARCHAR(255);
 
-SELECT * FROM silver_transactions;
-
--- Step 4: Update the new columns with transformed data
--- Time-based transformations
+-- Step 5: Replace NULLs with meaningful defaults
+-- Split into multiple updates for better performance and error handling
 UPDATE silver_transactions
 SET 
-    transaction_year = YEAR(TransactionDate),
-    transaction_month = MONTH(TransactionDate),
-    transaction_quarter = QUARTER(TransactionDate),
-    day_of_week = DAYNAME(TransactionDate),
-    is_weekend = CASE WHEN DAYOFWEEK(TransactionDate) IN (1, 7) THEN TRUE ELSE FALSE END;
+    CustomerID = COALESCE(CustomerID, -1),
+    TransactionDate = COALESCE(TransactionDate, '1900-01-01'),
+    PaymentMethod = COALESCE(PaymentMethod, 'Unknown'),
+    StoreType = COALESCE(StoreType, 'General');
 
-SELECT * FROM silver_transactions;
+UPDATE silver_transactions
+SET 
+    CustomerAge = COALESCE(CustomerAge, 30),
+    CustomerGender = COALESCE(CustomerGender, 'Unknown'),
+    ProductName = COALESCE(ProductName, 'Uncategorized'),
+    Region = COALESCE(Region, 'Unknown');
 
+UPDATE silver_transactions
+SET 
+    TransactionAmount = COALESCE(TransactionAmount, 0),
+    DiscountPercent = COALESCE(DiscountPercent, 0),
+    LoyaltyPoints = COALESCE(LoyaltyPoints, 0),
+    ShippingCost = COALESCE(ShippingCost, 0),
+    DeliveryTimeDays = COALESCE(DeliveryTimeDays, 5),
+    Quantity = COALESCE(Quantity, 1),  -- Added Quantity default
+    FeedbackScore = COALESCE(FeedbackScore, 0),  -- Added FeedbackScore default
+    Returned = COALESCE(Returned, 'No'),  -- Added Returned default
+    IsPromotional = COALESCE(IsPromotional, 'No');  -- Added IsPromotional default
 
-DESC silver_transactions;
+-- Step 6: Populate date-related columns
+-- Added error handling for invalid dates
+UPDATE silver_transactions
+SET 
+    transaction_year = CASE 
+        WHEN TransactionDate = '1900-01-01' THEN NULL 
+        ELSE YEAR(TransactionDate) 
+    END,
+    transaction_month = CASE 
+        WHEN TransactionDate = '1900-01-01' THEN NULL 
+        ELSE MONTH(TransactionDate) 
+    END,
+    transaction_quarter = CASE 
+        WHEN TransactionDate = '1900-01-01' THEN NULL 
+        ELSE QUARTER(TransactionDate) 
+    END,
+    day_of_week = CASE 
+        WHEN TransactionDate = '1900-01-01' THEN NULL 
+        ELSE DAYNAME(TransactionDate) 
+    END,
+    is_weekend = CASE 
+        WHEN TransactionDate = '1900-01-01' THEN NULL 
+        WHEN DAYOFWEEK(TransactionDate) IN (1, 7) THEN TRUE 
+        ELSE FALSE 
+    END;
 
-ALTER TABLE silver_transactions 
-MODIFY COLUMN discount_amount DECIMAL(12,4) NULL,
-MODIFY COLUMN total_sale_value DECIMAL(12,4) NULL;
-
-
-SELECT 
-    MAX(TransactionAmount) AS MaxTransactionAmount, 
-    MAX(DiscountPercent) AS MaxDiscountPercent 
-FROM silver_transactions;
-
-ALTER TABLE silver_transactions 
-MODIFY COLUMN discount_amount DECIMAL(18,6) NULL,
-MODIFY COLUMN total_sale_value DECIMAL(18,6) NULL;
-
-
--- Financial calculations
+-- Step 7: Calculate financial metrics
+-- Added validation for negative values
 UPDATE silver_transactions
 SET 
     discount_amount = CASE 
-        WHEN DiscountPercent IS NOT NULL THEN (TransactionAmount * (DiscountPercent / 100))
+        WHEN TransactionAmount >= 0 AND DiscountPercent >= 0 
+        THEN ROUND(TransactionAmount * (DiscountPercent / 100), 2)
         ELSE 0 
-    END,
-    total_sale_value = CASE 
-        WHEN ShippingCost IS NOT NULL THEN TransactionAmount + ShippingCost
-        ELSE TransactionAmount 
     END;
 
-SELECT discount_amount, total_sale_value
-FROM silver_transactions
-WHERE discount_amount IS NULL OR total_sale_value IS NULL
-LIMIT 10;
+UPDATE silver_transactions
+SET 
+    total_sale_value = CASE 
+        WHEN TransactionAmount >= 0 AND ShippingCost >= 0 
+        THEN TransactionAmount + ShippingCost
+        ELSE TransactionAmount 
+    END,
+    net_revenue = CASE 
+        WHEN (TransactionAmount + ShippingCost - discount_amount) >= 0 
+        THEN TransactionAmount + ShippingCost - discount_amount
+        ELSE 0 
+    END;
 
-
--- UPDATE silver_transactions SET net_revenue = total_sale_value - discount_amount; got error
-
-SHOW COLUMNS FROM silver_transactions LIKE 'net_revenue';
-
-SELECT MAX(total_sale_value - discount_amount) FROM silver_transactions;
-
-ALTER TABLE silver_transactions MODIFY COLUMN net_revenue DECIMAL(18,6);
-
-UPDATE silver_transactions SET net_revenue = total_sale_value - discount_amount;
-
-SELECT * FROM silver_transactions;
-
-
-SELECT DISTINCT CustomerAge, LoyaltyPoints 
-FROM silver_transactions;
-
--- Customer segmentation
+-- Step 8: Update customer segmentation
 UPDATE silver_transactions
 SET 
     age_group = CASE 
-        WHEN CustomerAge IS NULL THEN 'Unknown'
+        WHEN CustomerAge < 0 THEN 'Invalid Age'
         WHEN CustomerAge < 25 THEN 'Young Adult'
         WHEN CustomerAge BETWEEN 25 AND 34 THEN 'Adult'
         WHEN CustomerAge BETWEEN 35 AND 49 THEN 'Middle Age'
@@ -145,74 +157,66 @@ SET
         ELSE 'Unknown'
     END,
     customer_segment = CASE 
-        WHEN LoyaltyPoints IS NULL THEN 'No Loyalty'
-        WHEN LoyaltyPoints > 1000 THEN 'Premium'
-        WHEN LoyaltyPoints BETWEEN 500 AND 1000 THEN 'Gold'
-        WHEN LoyaltyPoints BETWEEN 100 AND 499 THEN 'Silver'
+        WHEN LoyaltyPoints < 0 THEN 'Invalid'
+        WHEN LoyaltyPoints >= 8000 THEN 'Premium'
+        WHEN LoyaltyPoints BETWEEN 5000 AND 7999 THEN 'Gold'
+        WHEN LoyaltyPoints BETWEEN 2000 AND 4999 THEN 'Silver'
         ELSE 'Bronze'
     END;
 
-
-SELECT * FROM silver_transactions;
-
-SELECT DISTINCT day_of_week 
-FROM silver_transactions;
-
-
-SELECT DISTINCT day_of_week
-FROM silver_transactions
-ORDER BY
-  CASE
-    day_of_week
-    WHEN 'Monday' THEN 1
-    WHEN 'Tuesday' THEN 2
-    WHEN 'Wednesday' THEN 3
-    WHEN 'Thursday' THEN 4
-    WHEN 'Friday' THEN 5
-    WHEN 'Saturday' THEN 6
-    WHEN 'Sunday' THEN 7
-  END;
-
-
-SELECT * FROM silver_transactions;
-
-SELECT DISTINCT Returned, DeliveryTimeDays 
-FROM silver_transactions;
-
+-- Step 9: Set transaction status
 UPDATE silver_transactions
 SET transaction_status = 
     CASE 
         WHEN Returned = 'Yes' THEN 'Returned'
-        WHEN DeliveryTimeDays IS NULL THEN 'Processing'
+        WHEN DeliveryTimeDays < 0 THEN 'Invalid Delivery Days'
+        WHEN DeliveryTimeDays <= 2 THEN 'Processing'
+        WHEN DeliveryTimeDays > 12 THEN 'Delayed'
         ELSE 'Completed'
     END;
-    
-SELECT * FROM silver_transactions;
 
--- Data quality scoring
+-- Step 10: Set data issue flags and quality scores
+-- Step 10: Set data issue flags 
+UPDATE silver_transactions
+SET data_issue_flag = 
+    CASE 
+        WHEN CustomerID = -1 THEN 'Missing Customer'
+        WHEN TransactionDate = '1900-01-01' THEN 'Missing Date'
+        WHEN ProductName = 'Uncategorized' THEN 'Uncategorized Product'
+        WHEN PaymentMethod = 'Unknown' THEN 'Unknown Payment Method'
+        WHEN TransactionAmount < 0 THEN 'Invalid Amount'
+        WHEN DeliveryTimeDays < 0 THEN 'Invalid Delivery Days'
+        ELSE 'Valid'
+    END;
+
+
+
+
+-- Step 11: Calculate data quality score with additional checks
 UPDATE silver_transactions
 SET data_quality_score = (
-    CASE WHEN CustomerID IS NOT NULL THEN 20 ELSE 0 END +
-    CASE WHEN TransactionAmount > 0 THEN 20 ELSE 0 END +
-    CASE WHEN ProductName IS NOT NULL THEN 20 ELSE 0 END +
-    CASE WHEN TransactionDate IS NOT NULL THEN 20 ELSE 0 END +
-    CASE WHEN PaymentMethod IS NOT NULL THEN 20 ELSE 0 END
+    CASE WHEN CustomerID != -1 THEN 20 ELSE 5 END +
+    CASE WHEN TransactionAmount >= 0 THEN 20 ELSE 0 END +
+    CASE WHEN ProductName != 'Uncategorized' THEN 20 ELSE 5 END +
+    CASE WHEN TransactionDate != '1900-01-01' THEN 20 ELSE 5 END +
+    CASE WHEN PaymentMethod != 'Unknown' THEN 20 ELSE 5 END +
+    CASE WHEN DeliveryTimeDays >= 0 THEN 0 ELSE -10 END  -- Penalty for invalid delivery days
 ) / 100;
 
--- Step 5: Verify the transformations
+-- Step 12: Final validation queries
 SELECT 
-    COUNT(*) as total_records,
-    COUNT(DISTINCT CustomerID) as unique_customers,
-    AVG(data_quality_score) as avg_quality_score,
-    COUNT(DISTINCT customer_segment) as segment_count
-FROM silver_transactions;
-
--- Sample data quality check
-SELECT 
-    customer_segment,
-    COUNT(*) as segment_count,
-    AVG(total_sale_value) as avg_sale_value,
-    AVG(data_quality_score) as avg_quality_score
+    data_quality_score, 
+    COUNT(*) AS total_records,
+    ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM silver_transactions), 2) AS percentage
 FROM silver_transactions
-GROUP BY customer_segment
-ORDER BY segment_count DESC;
+GROUP BY data_quality_score
+ORDER BY data_quality_score DESC;
+
+-- Calculate percentage distribution of data issues
+SELECT 
+    data_issue_flag,
+    COUNT(*) AS total_records,
+    ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM silver_transactions), 2) AS percentage
+FROM silver_transactions
+GROUP BY data_issue_flag
+ORDER BY percentage DESC;
