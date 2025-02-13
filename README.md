@@ -355,9 +355,7 @@ assessment-medallion-sql
 │   ├── silver_layer.sql    # Cleansed Data Queries (Future Work)
 │   ├── gold_layer.sql      # Business Insights Queries (Future Work)
 │
-├── documentation
-│   ├── design_decisions.md  # Why Medallion Architecture?
-│   ├── best_practices.md    # SQL Optimization & Indexing
+
 ```
 
 ---
