@@ -19,7 +19,7 @@ The dataset contains **500,000 transactions** with fields like `TransactionID`, 
 
 ---
 
-## *🤍 **Bronze Layer Processing**
+## 🤍 **Bronze Layer Processing**
 
 ### **1️⃣ Table Creation & Initial Data Load**
 - Created the `bronze_transactions` table using **MySQL Workbench’s Table Data Import**.
