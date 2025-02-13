@@ -3,6 +3,7 @@ CREATE TABLE silver_transactions_backup AS
 SELECT * FROM silver_transactions;
 
 -- Step 2: Drop and recreate silver_transactions table
+-- Removed TRANSACTIONS schema reference as it wasn't consistently used
 DROP TABLE IF EXISTS silver_transactions;
 
 CREATE TABLE silver_transactions (
@@ -188,7 +189,14 @@ SET data_issue_flag =
         ELSE 'Valid'
     END;
 
-
+-- Calculate percentage distribution of data issues
+SELECT 
+    data_issue_flag,
+    COUNT(*) AS total_records,
+    ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM silver_transactions), 2) AS percentage
+FROM silver_transactions
+GROUP BY data_issue_flag
+ORDER BY percentage DESC;
 
 
 -- Step 11: Calculate data quality score with additional checks
@@ -204,8 +212,8 @@ SET data_quality_score = (
 
 -- Step 12: Final validation queries
 SELECT 
-    data_quality_score, 
     COUNT(*) AS total_records,
+    data_quality_score, 
     ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM silver_transactions), 2) AS percentage
 FROM silver_transactions
 GROUP BY data_quality_score
@@ -219,3 +227,38 @@ SELECT
 FROM silver_transactions
 GROUP BY data_issue_flag
 ORDER BY percentage DESC;
+
+
+SELECT 
+    COUNT(*) as total_count,
+    COUNT(CASE WHEN CustomerID = -1 THEN 1 END) as missing_customer_count,
+    COUNT(CASE WHEN TransactionDate = '1900-01-01' THEN 1 END) as missing_date_count,
+    COUNT(CASE WHEN ProductName = 'Uncategorized' THEN 1 END) as uncategorized_product_count,
+    COUNT(CASE WHEN PaymentMethod = 'Unknown' THEN 1 END) as unknown_payment_count,
+    COUNT(CASE WHEN TransactionAmount < 0 THEN 1 END) as invalid_amount_count,
+    COUNT(CASE WHEN DeliveryTimeDays < 0 THEN 1 END) as invalid_delivery_count
+FROM silver_transactions;
+
+-- Then, modify the update statement to handle priority of issues
+UPDATE silver_transactions
+SET data_issue_flag = 
+    CASE 
+        WHEN CustomerID = -1 THEN 'Missing Customer'                   -- Highest priority
+        WHEN ProductName = 'Uncategorized' THEN 'Uncategorized Product'
+        WHEN TransactionAmount < 0 THEN 'Invalid Amount'
+        WHEN TransactionDate = '1900-01-01' THEN 'Missing Date'
+        WHEN PaymentMethod = 'Unknown' THEN 'Unknown Payment Method'
+        WHEN DeliveryTimeDays < 0 THEN 'Invalid Delivery Days'
+        ELSE 'Valid'
+    END;
+
+-- Verify the update with counts and percentages
+SELECT 
+    data_issue_flag,
+    COUNT(*) AS total_records,
+    ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM silver_transactions), 2) AS percentage
+FROM silver_transactions
+GROUP BY data_issue_flag
+ORDER BY total_records DESC;
+
+
