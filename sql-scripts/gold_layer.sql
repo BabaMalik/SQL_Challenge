@@ -1,20 +1,3 @@
-DROP TABLE IF EXISTS gold_transactions;
-CREATE TABLE gold_transactions (
-    CustomerID INT,
-    CustomerLifetimeValue DECIMAL(18,2),
-    TotalTransactions INT,
-    TotalSpent DECIMAL(18,2),
-    AvgTransactionValue DECIMAL(18,2),
-    ReturnRate DECIMAL(5,2),
-    MostPurchasedProduct VARCHAR(100),
-    PreferredPaymentMethod VARCHAR(50),
-    CustomerSegment VARCHAR(50),
-    Region VARCHAR(50),
-    MonthlyTrend TEXT,
-    YearOverYearGrowth DECIMAL(5,2)
-);
-
-
 -- 1. Customer Analytics Table
 CREATE TABLE gold_customer_analytics AS
 SELECT 
