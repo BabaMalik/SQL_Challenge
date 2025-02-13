@@ -1,3 +1,7 @@
+SELECT * FROM TRANSACTIONS.assessment_dataset;
+
+SELECT count(*) FROM TRANSACTIONS.assessment_dataset;
+
 CREATE TABLE TRANSACTIONS.bronze_transactions (
     TransactionID INT,
     CustomerID INT,
