@@ -77,37 +77,33 @@ FROM bronze_transactions;
 ```
 
 
-# 🥈 Silver Layer - Data Transformation & Enrichment
+# 🥈 Silver Layer - Data Transformation, Cleansing & Enrichment
 
 
 ## 📌 Overview
-This repository contains **SQL scripts** for processing and transforming transactional data in the **silver layer** . The **silver layer** refines raw data from the **bronze layer**, ensures data quality, and prepares it for the **gold layer**, where analytics and reporting are performed.
+
+## Overview
+The **Silver Layer** is an enriched, cleansed, and structured version of transactional data obtained from the **Bronze Layer**. This layer ensures data integrity, assigns default values to missing records, and enhances data with additional derived attributes for downstream analysis in the **Gold Layer**.
 
 ### 🔹 **Key Features**
-- ✅ **Backup existing data** before transformations.
-- ✅ **Schema standardization** for consistency.
-- ✅ **NULL value handling** and default replacements.
-- ✅ **Derived columns** for enhanced analysis.
-- ✅ **Financial calculations** (total sale value, discount, net revenue).
-- ✅ **Customer segmentation** based on **age and loyalty**.
-- ✅ **Transaction status classification**.
-- ✅ **Data quality scoring** and **issue flagging**.
+- Cleanse and standardize raw transaction data
+- Replace NULL values with meaningful defaults
+- Derive additional attributes to improve analytical capabilities
+- Assign data quality scores and issue flags for better reporting
 
 ---
 
-## 🚀 **Data Transformation Steps**
+## Steps in the Silver Layer Processing
 
-### **Step 1: Backup Existing Data**
-Before making changes, we create a backup to avoid data loss.
+### **1. Backup Existing Silver Table**
 ```sql
 CREATE TABLE silver_transactions_backup AS
 SELECT * FROM silver_transactions;
 ```
 
-### **Step 2: Drop & Recreate the Silver Table**
-We remove inconsistencies by **rebuilding the table schema**.
+### **2. Drop and Recreate `silver_transactions` Table**
 ```sql
-DROP TABLE IF EXISTS silver_transactions;
+DROP TABLE IF EXISTS TRANSACTIONS.silver_transactions;
 
 CREATE TABLE silver_transactions (
     TransactionID INT PRIMARY KEY,
@@ -121,25 +117,38 @@ CREATE TABLE silver_transactions (
     StoreType VARCHAR(255) NULL,
     CustomerAge INT NULL,
     CustomerGender VARCHAR(255) NULL,
-    LoyaltyPoints INT NULL,
-    ProductName VARCHAR(255) NULL,
-    Region VARCHAR(255) NULL,
-    Returned VARCHAR(255) NULL,
-    FeedbackScore INT NULL,
+    LoyaltyPoints INT,
+    ProductName VARCHAR(255),
+    Region VARCHAR(255),
+    Returned VARCHAR(255),
+    FeedbackScore INT,
     ShippingCost DECIMAL(10,2) NULL,
-    DeliveryTimeDays INT NULL,
-    IsPromotional VARCHAR(255) NULL
+    DeliveryTimeDays INT,
+    IsPromotional VARCHAR(255)
 );
 ```
 
-### **Step 3: Load Data from Bronze Layer**
+### **3. Insert Data from Bronze Layer**
 ```sql
 INSERT INTO silver_transactions
 SELECT * FROM bronze_transactions;
 ```
 
-### **Step 4: Add Feature Columns**
-New columns for **derived attributes** and **data quality tracking**:
+### **4. Replace NULL Values with Meaningful Defaults**
+```sql
+UPDATE silver_transactions
+SET
+    CustomerID = COALESCE(CustomerID, -1),
+    TransactionDate = COALESCE(TransactionDate, '1900-01-01'),
+    PaymentMethod = COALESCE(PaymentMethod, 'Unknown'),
+    StoreType = COALESCE(StoreType, 'General'),
+    CustomerAge = COALESCE(CustomerAge, 30),
+    CustomerGender = COALESCE(CustomerGender, 'Unknown'),
+    ProductName = COALESCE(ProductName, 'Uncategorized'),
+    Region = COALESCE(Region, 'Unknown');
+```
+
+### **5. Add Enrichment Columns**
 ```sql
 ALTER TABLE silver_transactions
 ADD COLUMN transaction_year INT,
@@ -157,32 +166,7 @@ ADD COLUMN data_quality_score DECIMAL(5,2),
 ADD COLUMN data_issue_flag VARCHAR(255);
 ```
 
----
-
-## 🔄 **Data Cleaning & Processing**
-### **Step 5: Handle NULL Values**
-Filling missing values with **default or calculated replacements**.
-```sql
-UPDATE silver_transactions
-SET
-    CustomerID = COALESCE(CustomerID, -1),
-    TransactionDate = COALESCE(TransactionDate, '1900-01-01'),
-    PaymentMethod = COALESCE(PaymentMethod, 'Unknown'),
-    StoreType = COALESCE(StoreType, 'General'),
-    CustomerAge = COALESCE(CustomerAge, 30),
-    CustomerGender = COALESCE(CustomerGender, 'Unknown'),
-    ProductName = COALESCE(ProductName, 'Uncategorized'),
-    Region = COALESCE(Region, 'Unknown'),
-    LoyaltyPoints = COALESCE(LoyaltyPoints, 0),
-    ShippingCost = COALESCE(ShippingCost, 0),
-    DeliveryTimeDays = COALESCE(DeliveryTimeDays, 5),
-    Quantity = COALESCE(Quantity, 1),
-    FeedbackScore = COALESCE(FeedbackScore, 0),
-    Returned = COALESCE(Returned, 'No'),
-    IsPromotional = COALESCE(IsPromotional, 'No');
-```
-
-### **Step 6: Populate Date-Based Columns**
+### **6. Populate New Columns**
 ```sql
 UPDATE silver_transactions
 SET
@@ -190,19 +174,19 @@ SET
     transaction_month = MONTH(TransactionDate),
     transaction_quarter = QUARTER(TransactionDate),
     day_of_week = DAYNAME(TransactionDate),
-    is_weekend = CASE WHEN DAYOFWEEK(TransactionDate) IN (1,7) THEN TRUE ELSE FALSE END;
+    is_weekend = CASE WHEN DAYOFWEEK(TransactionDate) IN (1, 7) THEN TRUE ELSE FALSE END;
 ```
 
-### **Step 7: Compute Financial Metrics**
+### **7. Compute Financial Metrics**
 ```sql
 UPDATE silver_transactions
 SET
-    discount_amount = ROUND(TransactionAmount * (DiscountPercent / 100), 2),
+    discount_amount = TransactionAmount * (DiscountPercent / 100),
     total_sale_value = TransactionAmount + ShippingCost,
     net_revenue = total_sale_value - discount_amount;
 ```
 
-### **Step 8: Customer Segmentation**
+### **8. Assign Customer Segments**
 ```sql
 UPDATE silver_transactions
 SET
@@ -212,48 +196,71 @@ SET
         WHEN CustomerAge BETWEEN 35 AND 49 THEN 'Middle Age'
         WHEN CustomerAge >= 50 THEN 'Senior'
         ELSE 'Unknown'
+    END,
+    customer_segment = CASE
+        WHEN LoyaltyPoints >= 8000 THEN 'Premium'
+        WHEN LoyaltyPoints BETWEEN 5000 AND 7999 THEN 'Gold'
+        WHEN LoyaltyPoints BETWEEN 2000 AND 4999 THEN 'Silver'
+        ELSE 'Bronze'
     END;
 ```
 
-### **Step 9: Transaction Status Classification**
+### **9. Assign Data Quality Scores**
 ```sql
 UPDATE silver_transactions
-SET transaction_status =
-    CASE
-        WHEN Returned = 'Yes' THEN 'Returned'
-        WHEN DeliveryTimeDays <= 2 THEN 'Processing'
-        WHEN DeliveryTimeDays > 12 THEN 'Delayed'
-        ELSE 'Completed'
-    END;
+SET data_quality_score = (
+    CASE WHEN CustomerID != -1 THEN 20 ELSE 5 END +
+    CASE WHEN TransactionAmount > 0 THEN 20 ELSE 0 END +
+    CASE WHEN ProductName != 'Uncategorized' THEN 20 ELSE 5 END +
+    CASE WHEN TransactionDate != '1900-01-01' THEN 20 ELSE 5 END +
+    CASE WHEN PaymentMethod != 'Unknown' THEN 20 ELSE 5 END
+) / 100;
 ```
 
----
-
-## 📊 **Data Quality & Issue Detection**
-### **Step 10: Data Quality Scoring & Issue Flagging**
+### **10. Assign Data Issue Flags**
 ```sql
 UPDATE silver_transactions
 SET data_issue_flag =
     CASE
         WHEN CustomerID = -1 THEN 'Missing Customer'
         WHEN TransactionDate = '1900-01-01' THEN 'Missing Date'
+        WHEN ProductName = 'Uncategorized' THEN 'Uncategorized Product'
+        WHEN PaymentMethod = 'Unknown' THEN 'Unknown Payment Method'
         ELSE 'Valid'
     END;
 ```
 
-### **Step 11: Data Validation Reports**
-#### **Data Issue Summary**
+### **11. Validate Data Integrity**
 ```sql
-SELECT
-    data_issue_flag,
-    COUNT(*) AS total_records,
-    ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM silver_transactions), 2) AS percentage
+SELECT data_issue_flag, COUNT(*) AS total_records
 FROM silver_transactions
 GROUP BY data_issue_flag
-ORDER BY percentage DESC;
+ORDER BY total_records DESC;
+```
+
+### **12. Missing Data Percentage Calculation**
+```sql
+SELECT
+    SUM(CASE WHEN CustomerID = -1 THEN 1 ELSE 0 END) AS missing_customerID,
+    ROUND((SUM(CASE WHEN CustomerID = -1 THEN 1 ELSE 0 END) * 100.0) / COUNT(*), 2) AS missing_customerID_pct,
+    
+    SUM(CASE WHEN TransactionDate = '1900-01-01' THEN 1 ELSE 0 END) AS missing_dates,
+    ROUND((SUM(CASE WHEN TransactionDate = '1900-01-01' THEN 1 ELSE 0 END) * 100.0) / COUNT(*), 2) AS missing_dates_pct,
+    
+    SUM(CASE WHEN ProductName = 'Uncategorized' THEN 1 ELSE 0 END) AS uncategorized_products,
+    ROUND((SUM(CASE WHEN ProductName = 'Uncategorized' THEN 1 ELSE 0 END) * 100.0) / COUNT(*), 2) AS uncategorized_products_pct,
+    
+    SUM(CASE WHEN PaymentMethod = 'Unknown' THEN 1 ELSE 0 END) AS unknown_payments,
+    ROUND((SUM(CASE WHEN PaymentMethod = 'Unknown' THEN 1 ELSE 0 END) * 100.0) / COUNT(*), 2) AS unknown_payments_pct
+FROM silver_transactions;
 ```
 
 ---
+
+## Conclusion
+This Silver Layer ensures that transaction data is **clean, enriched, and structured** before moving into the Gold Layer for final aggregation and reporting. The transformation pipeline handles missing values, assigns data quality scores, and ensures consistency across the dataset.
+
+
 
 ## 🛠 **Contributing**
 1. Fork this repository.
