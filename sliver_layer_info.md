@@ -258,3 +258,19 @@ In the **Silver Layer**, we successfully:
 This **cleaned & structured data** is now ready for **Gold Layer** processing, where we will generate **business intelligence insights, aggregations, and reporting dashboards**. 🚀
 
 ---
+
+
+```
+| Feature        | Normalization                               | Denormalization                             |
+|----------------|---------------------------------------------|---------------------------------------------|
+| **Goal** | Minimize redundancy, ensure integrity      | Improve read performance                    |
+| **Redundancy** | Low (reduces duplication)                  | High (introduces duplication)                |
+| **Integrity** | High (enforces consistency)                | Potentially lower (risk of inconsistencies) |
+| **Performance**| Slower reads (more joins)                  | Faster reads (fewer joins)                  |
+| **Complexity** | More tables, complex relationships         | Fewer tables, simpler relationships        |
+| **Updates** | Easier (less chance of anomalies)          | Harder (updates must be propagated)       |
+| **Use Cases** | OLTP (transactional systems), frequent updates | OLAP (data warehousing), read-heavy systems |
+| **Data Anomalies** | Reduced or eliminated. | Increased possibility. |
+| **Storage Space** | Potentially higher number of tables, potentially lower overall data storage due to less duplication. | Potentially lower number of tables, potentially higher overall data storage due to data duplication. |
+```
+
