@@ -1,4 +1,5 @@
 -- QUERIES ARE NOT TESTED YET
+
 -- 1. Customer Analytics Table
 CREATE TABLE gold_customer_analytics AS
 SELECT 
@@ -21,6 +22,7 @@ GROUP BY CustomerID;
 
 
 -- 2. Product Performance Metrics
+
 CREATE TABLE gold_product_performance AS
 SELECT 
     ProductName,
@@ -36,6 +38,7 @@ FROM silver_transactions
 GROUP BY ProductName;
 
 -- 3. Store Performance Dashboard
+
 CREATE TABLE gold_store_performance AS
 SELECT 
     StoreType,
