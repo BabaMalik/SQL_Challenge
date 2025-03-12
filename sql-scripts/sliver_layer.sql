@@ -1,5 +1,5 @@
 -- Step 1: Backup existing table
-CREATE TABLE silver_transactions_backup AS 
+CREATE TABLE silver_transactions_backup A 
 SELECT * FROM silver_transactions;
 
 -- Step 2: Drop and recreate silver_transactions table
