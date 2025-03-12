@@ -8,7 +8,7 @@ The **Medallion Architecture** is a data engineering design pattern used to orga
 
 - **🤍 Bronze Layer**: Raw data ingestion
 - **⚪ Silver Layer**: Cleaned, processed, and structured data
-- **🟡 Gold Layer**: Business intelligence, aggregated insights, and reporting
+- **🟡 Gold Layer**: Business intelligence, aggregated insights, and reportin
 
 This repository covers all three layers, ensuring raw data is correctly ingested, cleaned, processed, and transformed for analytics.
 
