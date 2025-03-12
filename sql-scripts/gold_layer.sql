@@ -1,4 +1,3 @@
--- QUERIES ARE NOT TESTED YET
 -- 1. Customer Analytics Table
 CREATE TABLE gold_customer_analytics AS
 SELECT 
